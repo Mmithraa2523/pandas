@@ -3,9 +3,9 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
-# -------------------------
+# ==========================================
 # PAGE CONFIG
-# -------------------------
+# ==========================================
 
 st.set_page_config(
     page_title="HCLTECH Stock Dashboard",
@@ -13,21 +13,67 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("📈 HCLTECH Stock Analytics Dashboard")
+# ==========================================
+# CUSTOM CSS
+# ==========================================
 
-# -------------------------
+st.markdown("""
+<style>
+
+.main {
+    padding-top: 1rem;
+}
+
+.metric-container {
+    background-color: #f5f5f5;
+    padding: 15px;
+    border-radius: 12px;
+    border: 1px solid #ddd;
+}
+
+h1 {
+    text-align: center;
+}
+
+div[data-testid="stMetric"] {
+    background-color: #222222;
+    border: 1px solid #e6e6e6;
+    padding: 15px;
+    border-radius: 10px;
+    text-align: center;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+# ==========================================
+# HEADER
+# ==========================================
+
+st.markdown("""
+<h1>📈 HCLTECH Stock Analytics Dashboard</h1>
+<p style='text-align:center;color:gray;'>
+Interactive Dashboard using Streamlit & Plotly
+</p>
+""", unsafe_allow_html=True)
+
+# ==========================================
 # LOAD DATA
-# -------------------------
+# ==========================================
 
-df = pd.read_csv("gold/hcltech.csv")
+@st.cache_data
+def load_data():
+    df = pd.read_csv("gold/hcltech.csv")
+    df["Date"] = pd.to_datetime(df["Date"], dayfirst=True)
+    return df
 
-df["Date"] = pd.to_datetime(df["Date"], dayfirst=True)
+df = load_data()
 
-# -------------------------
-# SIDEBAR FILTER
-# -------------------------
+# ==========================================
+# SIDEBAR
+# ==========================================
 
-st.sidebar.header("Filters")
+st.sidebar.title("📊 Dashboard Filters")
 
 start_date = st.sidebar.date_input(
     "Start Date",
@@ -40,15 +86,16 @@ end_date = st.sidebar.date_input(
 )
 
 filtered_df = df[
-    (df["Date"] >= pd.to_datetime(start_date)) &
+    (df["Date"] >= pd.to_datetime(start_date))
+    &
     (df["Date"] <= pd.to_datetime(end_date))
 ]
 
-# -------------------------
+# ==========================================
 # KPI CARDS
-# -------------------------
+# ==========================================
 
-st.subheader("Key Metrics")
+st.subheader("📌 Key Metrics")
 
 col1, col2, col3, col4 = st.columns(4)
 
@@ -76,175 +123,173 @@ with col4:
         f"{int(filtered_df['Volume'].mean()):,}"
     )
 
-# -------------------------
-# STOCK PRICE TREND
-# -------------------------
+# ==========================================
+# TABS
+# ==========================================
 
-st.subheader("Closing Price Trend")
-
-fig = px.line(
-    filtered_df,
-    x="Date",
-    y="Close"
+tab1, tab2, tab3 = st.tabs(
+    [
+        "📊 Overview",
+        "📈 Analysis",
+        "📄 Dataset"
+    ]
 )
 
-st.plotly_chart(
-    fig,
-    use_container_width=True
-)
+# ==========================================
+# OVERVIEW TAB
+# ==========================================
 
-# -------------------------
-# MOVING AVERAGE
-# -------------------------
+with tab1:
 
-st.subheader("Moving Average Analysis")
+    st.subheader("📈 Closing Price Trend")
 
-fig_ma = go.Figure()
-
-fig_ma.add_trace(
-    go.Scatter(
-        x=filtered_df["Date"],
-        y=filtered_df["Close"],
-        name="Close Price"
+    fig_close = px.line(
+        filtered_df,
+        x="Date",
+        y="Close",
+        title="Closing Price Trend"
     )
-)
 
-fig_ma.add_trace(
-    go.Scatter(
-        x=filtered_df["Date"],
-        y=filtered_df["Ma_5day"],
-        name="5 Day MA"
+    fig_close.update_layout(
+        hovermode="x unified"
     )
-)
 
-fig_ma.add_trace(
-    go.Scatter(
-        x=filtered_df["Date"],
-        y=filtered_df["Ma_20day"],
-        name="20 Day MA"
+    st.plotly_chart(
+        fig_close,
+        use_container_width=True
     )
-)
 
-st.plotly_chart(
-    fig_ma,
-    use_container_width=True
-)
+    st.subheader("📊 Trend Distribution")
 
-# -------------------------
-# VOLUME ANALYSIS
-# -------------------------
+    trend_count = filtered_df["Trend"].value_counts()
 
-st.subheader("Trading Volume")
+    fig_pie = px.pie(
+        values=trend_count.values,
+        names=trend_count.index,
+        hole=0.4
+    )
 
-fig_volume = px.bar(
-    filtered_df,
-    x="Date",
-    y="Volume"
-)
+    st.plotly_chart(
+        fig_pie,
+        use_container_width=True
+    )
 
-st.plotly_chart(
-    fig_volume,
-    use_container_width=True
-)
+    uptrend = (filtered_df["Trend"] == "Uptrend").sum()
+    downtrend = (filtered_df["Trend"] == "Downtrend").sum()
 
-# -------------------------
-# DAILY RETURN
-# -------------------------
+    st.success(
+        f"📈 Uptrend Days: {uptrend} | 📉 Downtrend Days: {downtrend}"
+    )
 
-st.subheader("Daily Return %")
+# ==========================================
+# ANALYSIS TAB
+# ==========================================
 
-fig_return = px.line(
-    filtered_df,
-    x="Date",
-    y="Daily_return"
-)
+with tab2:
 
-st.plotly_chart(
-    fig_return,
-    use_container_width=True
-)
+    # Moving Average
 
-# -------------------------
-# VOLATILITY
-# -------------------------
+    st.subheader("📈 Moving Average Analysis")
 
-st.subheader("Volatility %")
+    fig_ma = go.Figure()
 
-fig_volatility = px.line(
-    filtered_df,
-    x="Date",
-    y="Volatility_%"
-)
+    fig_ma.add_trace(
+        go.Scatter(
+            x=filtered_df["Date"],
+            y=filtered_df["Close"],
+            name="Close Price"
+        )
+    )
 
-st.plotly_chart(
-    fig_volatility,
-    use_container_width=True
-)
+    fig_ma.add_trace(
+        go.Scatter(
+            x=filtered_df["Date"],
+            y=filtered_df["Ma_5day"],
+            name="5 Day MA"
+        )
+    )
 
-# -------------------------
-# TREND DISTRIBUTION
-# -------------------------
+    fig_ma.add_trace(
+        go.Scatter(
+            x=filtered_df["Date"],
+            y=filtered_df["Ma_20day"],
+            name="20 Day MA"
+        )
+    )
 
-st.subheader("Trend Distribution")
+    st.plotly_chart(
+        fig_ma,
+        use_container_width=True
+    )
 
-trend_count = filtered_df["Trend"].value_counts()
+    # Volume
 
-fig_pie = px.pie(
-    values=trend_count.values,
-    names=trend_count.index
-)
+    st.subheader("📦 Trading Volume")
 
-st.plotly_chart(
-    fig_pie,
-    use_container_width=True
-)
+    fig_volume = px.bar(
+        filtered_df,
+        x="Date",
+        y="Volume"
+    )
 
-# -------------------------
-# CORRELATION MATRIX
-# -------------------------
+    st.plotly_chart(
+        fig_volume,
+        use_container_width=True
+    )
 
-st.subheader("Correlation Matrix")
+    # Daily Return
 
-corr_cols = [
-    "Close",
-    "Volume",
-    "Daily_return",
-    "Price_Range",
-    "Volatility_%"
-]
+    st.subheader("💹 Daily Return (%)")
 
-corr = filtered_df[corr_cols].corr()
+    fig_return = px.line(
+        filtered_df,
+        x="Date",
+        y="Daily_return"
+    )
 
-fig_corr = px.imshow(
-    corr,
-    text_auto=True
-)
+    st.plotly_chart(
+        fig_return,
+        use_container_width=True
+    )
 
-st.plotly_chart(
-    fig_corr,
-    use_container_width=True
-)
+    # Volatility
 
-# -------------------------
-# DATA TABLE
-# -------------------------
+    st.subheader("⚡ Volatility (%)")
 
-st.subheader("Dataset")
+    fig_volatility = px.line(
+        filtered_df,
+        x="Date",
+        y="Volatility_%"
+    )
 
-st.dataframe(
-    filtered_df,
-    use_container_width=True
-)
+    st.plotly_chart(
+        fig_volatility,
+        use_container_width=True
+    )
 
-# -------------------------
-# DOWNLOAD BUTTON
-# -------------------------
 
-csv = filtered_df.to_csv(index=False)
+# ==========================================
+# DATASET TAB
+# ==========================================
 
-st.download_button(
-    "Download Filtered Data",
-    csv,
-    "filtered_hcltech.csv",
-    "text/csv"
-)
+with tab3:
+
+    st.subheader("📄 Gold Layer Dataset")
+
+    st.dataframe(
+        filtered_df,
+        use_container_width=True,
+        height=500
+    )
+
+    csv = filtered_df.to_csv(index=False)
+
+    st.download_button(
+        label="⬇ Download Filtered Dataset",
+        data=csv,
+        file_name="hcltech_filtered_data.csv",
+        mime="text/csv"
+    )
+
+
+
